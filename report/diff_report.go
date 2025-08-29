@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -258,14 +261,8 @@ func (d *DiffReport) FileCoveragesTable(files []*gh.PullRequestFile) string {
 		return ""
 	}
 	var t, c, pt, pc int
-	exist := false
 	var rows [][]string
-	for _, f := range files {
-		fc, err := d.Coverage.Files.FuzzyFindByFile(f.Filename)
-		if err != nil {
-			continue
-		}
-		exist = true
+	appendRow := func(name string, fc *coverage.DiffFileCoverage, status string) {
 		diff := fmt.Sprintf("%.1f%%", floor1(fc.Diff))
 		if fc.Diff > 0 {
 			diff = fmt.Sprintf("+%.1f%%", floor1(fc.Diff))
@@ -278,9 +275,42 @@ func (d *DiffReport) FileCoveragesTable(files []*gh.PullRequestFile) string {
 			pc += fc.FileCoverageB.Covered
 			pt += fc.FileCoverageB.Total
 		}
-		rows = append(rows, []string{fmt.Sprintf("[%s](%s)", f.Filename, f.BlobURL), fmt.Sprintf("%.1f%%", floor1(fc.A)), diff, f.Status})
+		rows = append(rows, []string{name, fmt.Sprintf("%.1f%%", floor1(fc.A)), diff, status})
 	}
-	if !exist {
+
+	prFiles := map[string]*gh.PullRequestFile{}
+	for _, f := range files {
+		fc, err := d.Coverage.Files.FuzzyFindByFile(f.Filename)
+		if err != nil {
+			continue
+		}
+		prFiles[fc.File] = f
+	}
+
+	for _, fc := range d.Coverage.Files {
+		if prf, ok := prFiles[fc.File]; ok {
+			appendRow(fmt.Sprintf("[%s](%s)", prf.Filename, prf.BlobURL), fc, prf.Status)
+			continue
+		}
+		if fc.Diff == 0 {
+			continue
+		}
+
+		name := fc.File
+		repoURL := fmt.Sprintf("%s/%s", os.Getenv("GITHUB_SERVER_URL"), os.Getenv("GITHUB_REPOSITORY"))
+		commit := ""
+		if fc.FileCoverageA != nil && d.CommitA != "" {
+			commit = d.CommitA
+		} else if fc.FileCoverageB != nil && d.CommitB != "" {
+			commit = d.CommitB
+		}
+		filePath := strings.TrimLeft(fc.File, repoURL)
+		if repoURL != "/" && repoURL != "" && commit != "" && !filepath.IsAbs(filePath) {
+			name = fmt.Sprintf("[%s](%s/blob/%s/%s)", filePath, repoURL, commit, filePath)
+		}
+		appendRow(name, fc, "affected")
+	}
+	if len(rows) == 0 {
 		return ""
 	}
 	coverAll := float64(c) / float64(t) * 100
@@ -312,6 +342,8 @@ func (d *DiffReport) FileCoveragesTable(files []*gh.PullRequestFile) string {
 	table.SetAutoWrapText(false)
 	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
 	table.SetCenterSeparator("|")
+
+	sort.Slice(rows, func(i, j int) bool { return rows[i][0] < rows[j][0] })
 	for _, v := range rows {
 		table.Append(v)
 	}
