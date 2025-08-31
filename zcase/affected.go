@@ -1,0 +1,10 @@
+package zcase
+
+// AffectedCase will be modified between A and B without being listed in PR files.
+func AffectedCase(n int) int {
+    total := 0
+    for i := 0; i < n; i++ {
+        total += i
+    }
+    return total
+}

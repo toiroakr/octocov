@@ -256,6 +256,7 @@ func (d *DiffReport) FileCoveragesTable(files []*gh.PullRequestFile) string {
 	if d.Coverage == nil {
 		return ""
 	}
+	fmt.Print(files)
 	if len(files) == 0 {
 		return ""
 	}
