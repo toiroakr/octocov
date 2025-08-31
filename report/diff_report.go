@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -257,6 +256,7 @@ func (d *DiffReport) FileCoveragesTable(files []*gh.PullRequestFile) string {
 	if d.Coverage == nil {
 		return ""
 	}
+	fmt.Print(files)
 	if len(files) == 0 {
 		return ""
 	}
@@ -342,8 +342,6 @@ func (d *DiffReport) FileCoveragesTable(files []*gh.PullRequestFile) string {
 	table.SetAutoWrapText(false)
 	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
 	table.SetCenterSeparator("|")
-
-	sort.Slice(rows, func(i, j int) bool { return rows[i][0] < rows[j][0] })
 	for _, v := range rows {
 		table.Append(v)
 	}
